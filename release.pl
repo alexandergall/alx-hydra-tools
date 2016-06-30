@@ -80,6 +80,7 @@ if ($type eq "ALX") {
 	my $tmpDir = $releaseDir . "-tmp";
 	File::Path::make_path($tmpDir);
 	copyFile("upgradeCommand", "alx-upgrade", $tmpDir);
+	copyFile("upgradeCommand", "release-notes.txt", $tmpDir);
 	copyFile("installImage", "nixos.tar.gz", $tmpDir);
 	copyFile("installConfig", "config", $tmpDir);
 	rename($tmpDir, $releaseDir) or die;
