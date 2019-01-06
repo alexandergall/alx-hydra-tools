@@ -84,6 +84,12 @@ if ($type eq "ALX") {
 	copyFile("installImage", "nixos.tar.gz", $tmpDir);
 	copyFile("installConfig", "config", $tmpDir);
 	rename($tmpDir, $releaseDir) or die;
+
+        my $latest = "$releasesDir/latest";
+        if (-e $latest) {
+            unlink($latest);
+        }
+        symlink($releaseDir, $latest);
     }
 } else {
     my $revFile = "$dataDir/installer-rev";
@@ -93,16 +99,13 @@ if ($type eq "ALX") {
 	print STDERR "installer current revision $curRev\n";
     }
     my $rev = $evalInfo->{jobsetevalinputs}->{installer}->{revision} or die;
+
     if ($curRev and $rev eq $curRev) {
 	print STDERR "installer unchanged\n";
     } else {
 	File::Path::make_path($installerDir);
-	File::Path::make_path($installerDir);
 	copyFile("nfsRootTarball", "nfsroot.tar.xz", $installerDir);
-	copyFile("kernel", "bzImage", $installerDir);
-	copyFile("bootLoader", "bootx64.efi", $installerDir);
-	copyFile("bootLoader", "grub.cfg", $installerDir);
-	copyFile("bootLoader", "generate", $installerDir);
+	copyFile("bootLoader", "boot-loader.tar.xz", $installerDir);
 	write_file($revFile, $rev);
     }
 }
