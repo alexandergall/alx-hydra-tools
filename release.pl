@@ -39,7 +39,7 @@ my $evalUrl = "http://hydra.net.switch.ch/eval/$evalId";
 my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 
 sub copyFile {
-    my ($jobName, $fileName, $tmpDir, $dstName) = @_;
+    my ($jobName, $fileName, $tmpDir, $dstName, $overwrite) = @_;
 
     my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
 
@@ -54,6 +54,9 @@ sub copyFile {
 	exit(1);
     }
     -d $dstDir || File::Path::make_path($dstDir);
+    if (-e $dstFile and $overwrite) {
+	unlink($dstFile);
+    }
     if (! -e $dstFile) {
 	print STDERR "copying $srcFile to $dstFile...\n";
 	if (system("cp $srcFile $dstFile") != 0) {
@@ -63,16 +66,26 @@ sub copyFile {
     }
 }
 
+sub getReleaseName {
+    my $buildInfo = decode_json(fetch("$evalUrl/job/versionALX", 'application/json'));
+    my $outPath = $buildInfo->{buildoutputs}->{out}->{path} or die;
+    open(my $fh, $outPath) or die;
+    my $releaseName = <$fh>;
+    close($fh) or die;
+    chomp $releaseName;
+    return "nixos-$releaseName";
+}
+
 if ($type eq "ALX") {
     my $releaseId = $info->{id} or die;
-    my $releaseName = $info->{nixname} or die;
+    my $releaseName = getReleaseName();
     my $alxMajor = ($releaseName =~ /^nixos-(.*ALX(pre)?)/)[0];
     defined $alxMajor or die "Invalid ALX version $releaseName\n";
     my $releaseDir = "$releasesDir/$alxMajor/$releaseName";
     
     my $rev = $evalInfo->{jobsetevalinputs}->{nixpkgs}->{revision} or die;
     
-    print STDERR "release is ‘$releaseName’ (build $releaseId), eval is $evalId, dir is ‘$releaseDir’, Git commit is $rev\n";
+    print STDERR "release is '$releaseName’ (build $releaseId), eval is $evalId, dir is '$releaseDir’, Git commit is $rev\n";
     
     if (-d $releaseDir) {
 	print STDERR "release already exists\n";
@@ -96,16 +109,14 @@ if ($type eq "ALX") {
     my $curRev = undef;
     if (-e $revFile) {
 	$curRev = read_file($revFile) or die;
-	print STDERR "installer current revision $curRev\n";
     }
     my $rev = $evalInfo->{jobsetevalinputs}->{installer}->{revision} or die;
 
-    if ($curRev and $rev eq $curRev) {
-	print STDERR "installer unchanged\n";
-    } else {
+    if (not $curRev or $rev ne $curRev) {
+	print STDERR "new installer revision $rev\n";
 	File::Path::make_path($installerDir);
-	copyFile("nfsRootTarball", "nfsroot.tar.xz", $installerDir);
-	copyFile("bootLoader", "boot-loader.tar.xz", $installerDir);
+	copyFile("nfsRootTarball", "nfsroot.tar.xz", $installerDir, undef, 1);
+	copyFile("bootLoader", "boot-loader.tar.xz", $installerDir, undef, 1);
 	write_file($revFile, $rev);
     }
 }
